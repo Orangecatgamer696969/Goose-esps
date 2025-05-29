@@ -1,0 +1,138 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+-- Function to create ESP for a player
+local function createESP(player)
+    if not player.Character then return end
+
+    local character = player.Character
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+
+    if not (humanoid and rootPart) then return end
+
+    -- Remove existing ESP if present
+    local oldBillboard = character:FindFirstChild("ESPBillboard")
+    local oldBox = character:FindFirstChild("ESPBox")
+    if oldBillboard then oldBillboard:Destroy() end
+    if oldBox then oldBox:Destroy() end
+
+    -- Create BillboardGui for name, health, and distance
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "ESPBillboard"
+    billboard.Adornee = rootPart
+    billboard.Size = UDim2.new(0, 100, 0, 75)
+    billboard.StudsOffset = Vector3.new(0, 3, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Parent = character
+
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Size = UDim2.new(1, 0, 0.33, 0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = player.Name
+    nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    nameLabel.TextStrokeTransparency = 0.5
+    nameLabel.TextScaled = true
+    nameLabel.Parent = billboard
+
+    local healthLabel = Instance.new("TextLabel")
+    healthLabel.Size = UDim2.new(1, 0, 0.33, 0)
+    healthLabel.Position = UDim2.new(0, 0, 0.33, 0)
+    healthLabel.BackgroundTransparency = 1
+    healthLabel.Text = math.floor(humanoid.Health) .. "/" .. humanoid.MaxHealth
+    healthLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+    healthLabel.TextStrokeTransparency = 0.5
+    healthLabel.TextScaled = true
+    healthLabel.Parent = billboard
+
+    local distanceLabel = Instance.new("TextLabel")
+    distanceLabel.Size = UDim2.new(1, 0, 0.33, 0)
+    distanceLabel.Position = UDim2.new(0, 0, 0.66, 0)
+    distanceLabel.BackgroundTransparency = 1
+    distanceLabel.Text = "0 studs"
+    distanceLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+    distanceLabel.TextStrokeTransparency = 0.5
+    distanceLabel.TextScaled = true
+    distanceLabel.Parent = billboard
+
+    -- Create BoxHandleAdornment for outline
+    local box = Instance.new("BoxHandleAdornment")
+    box.Name = "ESPBox"
+    box.Size = character:GetExtentsSize() * 1.1
+    box.Adornee = character
+    box.Color3 = Color3.fromRGB(255, 0, 0)
+    box.Transparency = 0.5
+    box.AlwaysOnTop = true
+    box.ZIndex = 10
+    box.Parent = character
+
+    -- Update ESP
+    local function updateESP()
+        if not (character and humanoid and rootPart and humanoid.Health > 0) then
+            billboard:Destroy()
+            box:Destroy()
+            return
+        end
+
+        -- Update health
+        healthLabel.Text = math.floor(humanoid.Health) .. "/" .. humanoid.MaxHealth
+        healthLabel.TextColor3 = Color3.fromRGB(
+            255 * (humanoid.Health / humanoid.MaxHealth),
+            255 * (1 - humanoid.Health / humanoid.MaxHealth),
+            0
+        )
+
+        -- Update distance
+        local localRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if localRoot then
+            local distance = (localRoot.Position - rootPart.Position).Magnitude
+            distanceLabel.Text = math.floor(distance) .. " studs"
+        end
+
+        -- Update box size
+        box.Size = character:GetExtentsSize() * 1.1
+    end
+
+    -- Connect updates
+    humanoid.HealthChanged:Connect(updateESP)
+    RunService.RenderStepped:Connect(updateESP)
+end
+
+-- Function to refresh ESP for all players
+local function refreshESP()
+    for _, player in pairs(Players:GetPlayers()) do
+        if player.Character then
+            createESP(player)
+        end
+    end
+end
+
+-- Initial ESP setup
+refreshESP()
+
+-- Reload ESP every second
+spawn(function()
+    while true do
+        refreshESP()
+        wait(1)
+    end
+end)
+
+-- Handle new players and character respawns
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function()
+        wait(0.5) -- Wait for character to fully load
+        createESP(player)
+    end)
+end)
+
+-- Clean up when player leaves
+Players.PlayerRemoving:Connect(function(player)
+    if player.Character then
+        local billboard = player.Character:FindFirstChild("ESPBillboard")
+        local box = player.Character:FindFirstChild("ESPBox")
+        if billboard then billboard:Destroy() end
+        if box then box:Destroy() end
+    end
+end)
